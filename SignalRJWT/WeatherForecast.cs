@@ -1,4 +1,4 @@
-namespace SignalRDemo1
+namespace SignalRJWT
 {
     public class WeatherForecast
     {
