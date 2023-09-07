@@ -40,7 +40,7 @@ namespace SignalRJWT.Controllers
         }
         
         [HttpPost]
-        public async Task<ActionResult<string>> Login(LoginInfo loginInfo)
+        public async Task<ActionResult<string>> Login(UserInfo loginInfo)
         {
             MyUser? user = await userManager.FindByNameAsync(loginInfo.userName);
             if (user == null) return BadRequest("用户名或密码错误");
@@ -65,7 +65,11 @@ namespace SignalRJWT.Controllers
                 }
                 string jwtToken = JwtHelper.BuildToken(claims, jwtSettings.Value);
 
-                return Ok(jwtToken);
+                return Ok(new
+                {
+                    name = user.UserName,
+                    token = jwtToken,
+                });
             }
             else
             {
@@ -73,6 +77,14 @@ namespace SignalRJWT.Controllers
                 return BadRequest("用户名或密码错误");
             }
         }
+
+        [HttpPost]
+        public async Task<ActionResult> AddUser(UserInfo user)
+        {
+            MyUser newUser = new MyUser() { UserName = user.userName };
+            await userManager.CreateAsync(newUser, user.password).CheckAsync();
+            return Ok();
+        }
     }
-    public record LoginInfo(string userName, string password);
+    public record UserInfo(string userName, string password);
 }

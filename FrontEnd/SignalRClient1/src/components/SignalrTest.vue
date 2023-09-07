@@ -1,13 +1,25 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { reactive, ref } from 'vue';
 import axios from 'axios';
 import * as signalR from '@microsoft/signalr';
-const userMessage = ref("");
-const loginInfo = ref({
+interface LoginResp {
+  name: string;
+  token: string;
+}
+const myName = ref("");
+const testResp = ref("");
+const loginInfo = reactive({
   userName: "wtf",
   password: "123456"
 });
-const testResp = ref("");
+
+const userMessage = ref("");
+const privateMessage = reactive({
+  toUserName: "",
+  message: ""
+});
+
+
 const messages = ref<string[]>([]);
 
 let signalRConn: signalR.HubConnection;
@@ -31,17 +43,21 @@ const startsignalRConn = async (token: string | undefined) => {
   signalRConn.on("ReceivePublicMessage", (msg: string) => { // 监听服务端发送的消息
     messages.value.push(msg);
   });
+  signalRConn.on("ReceicePrivateMessage", (currentUser: string, toUser: string, time: string, msg: string) => {
+    messages.value.push(`${currentUser}在${time}对${toUser}私信: ${msg}`);
+  });
 };
 
 const Login = async () => {
   try {
-    const res = await axios.post<string>('http://localhost:5021/api/Test/Login', loginInfo.value);
+    const res = await axios.post<LoginResp>('http://localhost:5021/api/Test/Login', loginInfo);
     alert("登录成功");
-    localStorage.setItem("token", res.data);
-    startsignalRConn(res.data);
+    localStorage.setItem("token", res.data.token);
+    startsignalRConn(res.data.token);
+    myName.value = res.data.name;
   } catch (error) {
-    loginInfo.value.password = "";
-    loginInfo.value.userName = "";
+    loginInfo.password = "";
+    loginInfo.userName = "";
     alert("登录失败，" + error);
   }
 };
@@ -68,29 +84,48 @@ const sendMsg = async () => {
     alert("无法发送消息，" + error);
   }
 };
+const sendPrivateMsg = async () => {
+  try {
+    await signalRConn.invoke("SendPrivateMessage", privateMessage.toUserName, privateMessage.message);
+    privateMessage.message = "";
+    privateMessage.toUserName = "";
+  } catch (error) {
+    alert("无法发送消息，" + error);
+  }
+};
 </script>
 
 <template>
   <fieldset>
-    <legend>SignalRClient1</legend>
+    <legend>
+      SignalRClient1
+      <span v-show="myName"> - 当前用户: {{ myName }}</span>
+    </legend>
     <div>
       用户名：<input type="text" v-model="loginInfo.userName">
     </div>
     <div>
       密&nbsp;&nbsp;&nbsp;码：<input type="text" v-model="loginInfo.password">
     </div>
+    <hr>
     <button @click="Login">登录</button>
     <button @click="LoginOut">登出</button>
     <hr>
     <button @click="testToken">测试登录后请求</button>
     <div>{{ testResp }}</div>
     <hr>
-    <legend>公屏：</legend>
-    <input type="text" v-model="userMessage" @keyup.enter="sendMsg" />
+    广播消息：<input type="text" v-model="userMessage" @keyup.enter="sendMsg" />
+    <legend>消息屏</legend>
     <div>
       <ul>
         <li v-for="(msg, index) in messages" :key="index">{{ msg }}</li>
       </ul>
+    </div>
+    <hr>
+    <legend>私聊</legend>
+    <div>
+      私聊对<input type="text" v-model="privateMessage.toUserName" />
+      说<input type="text" v-model="privateMessage.message" @keyup.enter="sendPrivateMsg" />
     </div>
   </fieldset>
 </template>
