@@ -24,15 +24,16 @@ namespace SignalRJWT.Hubs
             return Clients.All.SendAsync("ReceivePublicMessage", msgToSend);
         }
 
-        public async Task SendPrivateMessage(string toUserName, string msg)
+        public async Task<string> SendPrivateMessage(string toUserName, string msg)
         {
             MyUser? toUser = await userManager.FindByNameAsync(toUserName);
-            if (toUser == null) return;
+            if (toUser == null) return "查无此人";
             string currentUserName = this.Context.User.FindFirstValue(ClaimTypes.Name);
             string currentUserId = this.Context.User.FindFirstValue(ClaimTypes.NameIdentifier);
             //await this.Clients.User(toUser.Id.ToString()).SendAsync("ReceicePrivateMessage", currentUserName, DateTime.Now.ToShortTimeString(), msg);
             var userList = new List<string> { currentUserId, toUser.Id.ToString() };
             await this.Clients.Users(userList).SendAsync("ReceicePrivateMessage", currentUserName, toUserName, DateTime.Now.ToShortTimeString(), msg);
+            return "发送成功";
         }
     }
 }

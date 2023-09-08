@@ -8,7 +8,7 @@ interface LoginResp {
 }
 const myName = ref("");
 const testResp = ref("");
-const loginInfo = reactive({
+const userInfo = reactive({
   userName: "wtf",
   password: "123456"
 });
@@ -50,14 +50,14 @@ const startsignalRConn = async (token: string | undefined) => {
 
 const Login = async () => {
   try {
-    const res = await axios.post<LoginResp>('http://localhost:5021/api/Test/Login', loginInfo);
+    const res = await axios.post<LoginResp>('http://localhost:5021/api/Test/Login', userInfo);
     alert("登录成功");
     localStorage.setItem("token", res.data.token);
     startsignalRConn(res.data.token);
     myName.value = res.data.name;
   } catch (error) {
-    loginInfo.password = "";
-    loginInfo.userName = "";
+    userInfo.password = "";
+    userInfo.userName = "";
     alert("登录失败，" + error);
   }
 };
@@ -66,6 +66,17 @@ const LoginOut = async () => {
   if (signalRConn) await signalRConn.stop(); // 停止连接
   localStorage.removeItem("token");
 };
+
+const AddUser =async () => {
+  try {
+    const res = await axios.post<string>('http://localhost:5021/api/SignalRDemo/AddUser', userInfo);
+    alert(res.data);
+  } catch (error) {
+    userInfo.password = "";
+    userInfo.userName = "";
+    alert("添加失败，" + error);
+  }
+}
 
 const testToken = async () => {
   const res = await axios.get<string>('http://localhost:5021/api/Hello', {
@@ -86,7 +97,8 @@ const sendMsg = async () => {
 };
 const sendPrivateMsg = async () => {
   try {
-    await signalRConn.invoke("SendPrivateMessage", privateMessage.toUserName, privateMessage.message);
+    let res = await signalRConn.invoke<string>("SendPrivateMessage", privateMessage.toUserName, privateMessage.message);
+    alert(res);
     privateMessage.message = "";
     privateMessage.toUserName = "";
   } catch (error) {
@@ -102,14 +114,15 @@ const sendPrivateMsg = async () => {
       <span v-show="myName"> - 当前用户: {{ myName }}</span>
     </legend>
     <div>
-      用户名：<input type="text" v-model="loginInfo.userName">
+      用户名：<input type="text" v-model="userInfo.userName">
     </div>
     <div>
-      密&nbsp;&nbsp;&nbsp;码：<input type="text" v-model="loginInfo.password">
+      密&nbsp;&nbsp;&nbsp;码：<input type="text" v-model="userInfo.password">
     </div>
     <hr>
     <button @click="Login">登录</button>
     <button @click="LoginOut">登出</button>
+    <button @click="AddUser">添加</button>
     <hr>
     <button @click="testToken">测试登录后请求</button>
     <div>{{ testResp }}</div>
