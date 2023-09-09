@@ -10,10 +10,12 @@ namespace SignalRJWT.Hubs
     public class ChatRoomHub : Hub
     {
         private readonly UserManager<MyUser> userManager;
+        private readonly ImportExecutor executor;
 
-        public ChatRoomHub(UserManager<MyUser> userManager)
+        public ChatRoomHub(UserManager<MyUser> userManager, ImportExecutor executor)
         {
             this.userManager = userManager;
+            this.executor = executor;
         }
         public Task SendPublicMessage(string msg)
         {
@@ -35,5 +37,16 @@ namespace SignalRJWT.Hubs
             await this.Clients.Users(userList).SendAsync("ReceicePrivateMessage", currentUserName, toUserName, DateTime.Now.ToShortTimeString(), msg);
             return "发送成功";
         }
+
+        public Task ImportECDict()
+        {
+            _ = executor.ExecuteAsync(this.Context.ConnectionId);
+            //_ = Task.Run(async () =>
+            //{
+            //    await executor.ExecuteAsync(this.Context.ConnectionId);
+            //});
+            return Task.CompletedTask;
+        }
+
     }
 }

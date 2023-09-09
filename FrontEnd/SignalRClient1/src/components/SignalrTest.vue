@@ -19,8 +19,12 @@ const privateMessage = reactive({
   message: ""
 });
 
-
 const messages = ref<string[]>([]);
+const dictImportState = ref("开始导入");
+const dictImportProgress = reactive({
+  now: 0,
+  max: 1
+});
 
 let signalRConn: signalR.HubConnection;
 
@@ -46,6 +50,14 @@ const startsignalRConn = async (token: string | undefined) => {
   signalRConn.on("ReceicePrivateMessage", (currentUser: string, toUser: string, time: string, msg: string) => {
     messages.value.push(`${currentUser}在${time}对${toUser}私信: ${msg}`);
   });
+  
+  signalRConn.on("DictImportState",(state: string) => {
+    dictImportState.value = state;
+  });
+  signalRConn.on("DictImportProgress", (now: number, max: number) => {
+    dictImportProgress.max = max;
+    dictImportProgress.now = now;
+  });
 };
 
 const Login = async () => {
@@ -67,7 +79,7 @@ const LoginOut = async () => {
   localStorage.removeItem("token");
 };
 
-const AddUser =async () => {
+const AddUser = async () => {
   try {
     const res = await axios.post<string>('http://localhost:5021/api/SignalRDemo/AddUser', userInfo);
     alert(res.data);
@@ -76,7 +88,7 @@ const AddUser =async () => {
     userInfo.userName = "";
     alert("添加失败，" + error);
   }
-}
+};
 
 const testToken = async () => {
   const res = await axios.get<string>('http://localhost:5021/api/Hello', {
@@ -105,6 +117,15 @@ const sendPrivateMsg = async () => {
     alert("无法发送消息，" + error);
   }
 };
+
+const importDict = async () => {
+  try {
+    await signalRConn.invoke("ImportECDict");
+  } catch (error) {
+    alert("导入失败，" + error);
+  }
+}
+
 </script>
 
 <template>
@@ -139,6 +160,15 @@ const sendPrivateMsg = async () => {
     <div>
       私聊对<input type="text" v-model="privateMessage.toUserName" />
       说<input type="text" v-model="privateMessage.message" @keyup.enter="sendPrivateMsg" />
+    </div>
+    <hr>
+    <legend>导入词典</legend>
+    <button @click="importDict" :disabled="dictImportState !== '开始导入'">
+      {{ dictImportState }}
+      <span v-show="dictImportProgress.now !==0">({{ dictImportProgress.now }}/{{ dictImportProgress.max }})</span>
+    </button>
+    <div>
+      <progress :value="dictImportProgress.now" :max="dictImportProgress.max"></progress>
     </div>
   </fieldset>
 </template>

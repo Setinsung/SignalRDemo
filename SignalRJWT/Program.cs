@@ -94,12 +94,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
 });
 
-
-//builder.Services.AddSignalR();
 builder.Services.AddSignalR().AddStackExchangeRedis("localhost", opt =>
 {
     opt.Configuration.ChannelPrefix = "SignalRTest1_";
 });
+
+
+builder.Services.Configure<ConnStrOptions>(
+    builder.Configuration.GetSection("ConnectionStrings"));
+builder.Services.AddTransient<ImportExecutor>();
+
 
 var app = builder.Build();
 
