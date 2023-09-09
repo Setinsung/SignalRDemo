@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using CsvHelper;
+using CsvHelper.Configuration;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using SignalRJWT.Hubs;
 using System.Data;
+using System.Globalization;
 
 namespace SignalRJWT
 {
@@ -35,7 +38,14 @@ namespace SignalRJWT
         public async Task DoExecuteAsync(ISingleClientProxy client)
         {
             await client.SendAsync("DictImportState", "准备数据...");
-            string[] lines = await File.ReadAllLinesAsync(@"stardict.csv");
+            using var reader = new StreamReader(@"./stardict.csv");
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                PrepareHeaderForMatch = args => args.Header.ToLower(),
+            });
+            var records = csv.GetRecordsAsync<DictRecord>();
+            List<DictRecord> dictRecords = await records.ToListAsync();
+
             using SqlBulkCopy bulkCopy = new(optionsConnStr);
             bulkCopy.DestinationTableName = "T_WordItems";
             bulkCopy.ColumnMappings.Add("Word", "Word");
@@ -50,28 +60,21 @@ namespace SignalRJWT
             dataTable.Columns.Add("Translation");
 
             await client.SendAsync("DictImportState", "导入中...");
-            int totalCount = lines.Length - 1;
-            for (int i = 1; i < lines.Length; i++)
+            int totalCount = dictRecords.Count();
+            for (int i = 0; i < totalCount; i++)
             {
-                string line = lines[i];
-                string[] lineStr = line.Split(',');
-                string word = lineStr[0];
-                string? phonetic = lineStr[1];
-                string? definition = lineStr[2];
-                string? translation = lineStr[3];
-
                 DataRow row = dataTable.NewRow();
-                row["Word"] = word;
-                row["Phonetic"] = phonetic;
-                row["Definition"] = definition;
-                row["Translation"] = translation;
+                row["Word"] = dictRecords[i].Word;
+                row["Phonetic"] = dictRecords[i].Phonetic;
+                row["Definition"] = dictRecords[i].Definition;
+                row["Translation"] = dictRecords[i].Translation;
                 dataTable.Rows.Add(row);
                 // 每1000条提交一次
                 if (dataTable.Rows.Count == 1000)
                 {
                     await bulkCopy.WriteToServerAsync(dataTable);
                     dataTable.Clear();
-                    await client.SendAsync("DictImportProgress", i, totalCount);
+                    await client.SendAsync("DictImportProgress", i + 1, totalCount);
                 }
             }
             await bulkCopy.WriteToServerAsync(dataTable); // 剩余的一组
